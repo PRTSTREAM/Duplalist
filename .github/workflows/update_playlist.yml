@@ -1,0 +1,28 @@
+name: Update and Clean Playlist
+
+on:
+  scheduled:
+    - cron: '0 */6 * x *' # Har 6 ghante me auto-update hoga (aap time change kar sakte hain)
+  workflow_dispatch: # Manual run button ke liye
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Run merger script
+        run: python merge_playlists.py
+
+      - name: Commit and push if changed
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.github.io"
+          git add playlist.m3u
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update and clean merged playlist" && git push)
