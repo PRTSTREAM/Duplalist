@@ -1,9 +1,9 @@
 name: Update and Clean Playlist
 
 on:
-  scheduled:
-    - cron: '0 */6 * x *' # Har 6 ghante me auto-update hoga (aap time change kar sakte hain)
-  workflow_dispatch: # Manual run button ke liye
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
 
 jobs:
   build:
