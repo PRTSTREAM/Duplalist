@@ -27,9 +27,7 @@ def parse_m3u(content):
         if line.startswith("#EXTINF:"):
             current_meta = line
         elif not line.startswith("#"):
-            # Yeh URL line hai
             if current_meta:
-                # Channel ka unique identifier nikalne ke liye title ya pura meta tag use karenge
                 channels.append({
                     'meta': current_meta,
                     'url': line
@@ -38,8 +36,6 @@ def parse_m3u(content):
     return channels
 
 def get_channel_identifier(meta):
-    # tvg-id ya title match karne ke liye clean name nikalna
-    # Example: #EXTINF:-1 tvg-logo="..." title="NEW 4K", Movie Name
     match = re.search(r'title=["\']([^"\']+)["\']', meta)
     if match:
         return match.group(1).strip().lower()
@@ -54,16 +50,12 @@ def main():
             content = fetch_m3u(url)
             parsed = parse_m3u(content)
             all_channels.extend(parsed)
-            print(print(f"Fetched {len(parsed)} items from {url}"))
+            print(f"Fetched {len(parsed)} items from {url}")
         except Exception as e:
             print(f"Error fetching {url}: {e}")
 
     # 2. Duplicate handling aur Pixeldrain priority logic
-    # Dictionary banayenge jisme key = channel title/identifier hogi
     channel_map = {}
-
-    for ch in all_channels.get if isinstance(all_channels, list) else []:
-        pass
 
     for ch in all_channels:
         identifier = get_channel_identifier(ch['meta'])
@@ -75,7 +67,6 @@ def main():
             existing_ch = channel_map[identifier]
             existing_url = existing_ch['url']
 
-            # Rule check: Agar current ya existing me pixeldrain hai aur dusre me pub- hai
             is_current_pixeldrain = "pixeldrain.dev" in url
             is_existing_pixeldrain = "pixeldrain.dev" in existing_url
             
@@ -83,14 +74,10 @@ def main():
             is_existing_pub = "pub-" in existing_url or "pub." in existing_url
 
             if is_current_pixeldrain and is_existing_pub:
-                # Current pixeldrain hai, purana pub wala hai -> Pixeldrain ko rakho
                 channel_map[identifier] = ch
             elif is_existing_pixeldrain and is_current_pub:
-                # Purana pixeldrain hai, naya pub wala hai -> Purana hi rehne do (Pixeldrain priority)
                 pass
             else:
-                # Agar dono same category ke hain ya alag hain, toh latest ya pehla wala rakh sakte hain
-                # Aapke mutabiq agar pixeldrain nahi hai toh jo hai use rakhlo
                 if not is_existing_pixeldrain and is_current_pixeldrain:
                     channel_map[identifier] = ch
 
