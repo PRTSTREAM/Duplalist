@@ -1,7 +1,7 @@
 import urllib.request
 import re
 
-# Dono M3U playlist ke URLs
+# Dono M3U playlist ke URLs (Order important hai: 1st list pehle aayegi)
 URLS = [
     "https://raw.githubusercontent.com/PRTSTREAM/Fly-final-/refs/heads/main/playlist.m3u",
     "https://raw.githubusercontent.com/PRTSTREAM/Finalfly-720/refs/heads/main/playlist.m3u"
@@ -42,55 +42,64 @@ def get_channel_identifier(meta):
     return meta.strip().lower()
 
 def main():
-    all_channels = []
+    channel_map = {}
     
-    # 1. Dono playlists ko fetch aur parse karo
-    for url in URLS:
+    # Dono playlists ko sequentially process karenge
+    # Pehle 1st playlist aayegi, fir 2nd playlist aayegi
+    for index, url in enumerate(URLS):
         try:
             content = fetch_m3u(url)
             parsed = parse_m3u(content)
-            all_channels.extend(parsed)
             print(f"Fetched {len(parsed)} items from {url}")
+            
+            for ch in parsed:
+                identifier = get_channel_identifier(ch['meta'])
+                url_val = ch['url']
+                
+                is_current_pixeldrain = "pixeldrain.dev" in url_val
+                is_current_pub = "pub-" in url_val or "pub." in url_val
+
+                if identifier not in channel_map:
+                    # Agar naya channel hai toh seedhe add kar lo
+                    channel_map[identifier] = {
+                        'ch': ch,
+                        'playlist_index': index
+                    }
+                else:
+                    # Agar duplicate mil gaya
+                    existing = channel_map[identifier]
+                    existing_ch = existing['ch']
+                    existing_url = existing_ch['url']
+                    
+                    is_existing_pixeldrain = "pixeldrain.dev" in existing_url
+                    is_existing_pub = "pub-" in existing_url or "pub." in existing_url
+
+                    # Rule 1: Agar ek me pixeldrain hai aur dusre me pub hai, toh pixeldrain ko hi rakho
+                    if is_current_pixeldrain and is_existing_pub:
+                        channel_map[identifier] = {'ch': ch, 'playlist_index': index}
+                    elif is_existing_pixeldrain and is_current_pub:
+                        pass # Purana pixeldrain hi rehne do
+                    else:
+                        # Rule 2: Agar dono same type ke hain (jaise dono pixeldrain ya dono pub), 
+                        # toh pehli playlist (index 0) wale ko hi priority deni hai.
+                        # Matlab agar pehle se 1st playlist ka data hai, toh 2nd wale ko ignore kar do.
+                        if existing['playlist_index'] > index:
+                            channel_map[identifier] = {'ch': ch, 'playlist_index': index}
+
         except Exception as e:
             print(f"Error fetching {url}: {e}")
 
-    # 2. Duplicate handling aur Pixeldrain priority logic
-    channel_map = {}
-
-    for ch in all_channels:
-        identifier = get_channel_identifier(ch['meta'])
-        url = ch['url']
-
-        if identifier not in channel_map:
-            channel_map[identifier] = ch
-        else:
-            existing_ch = channel_map[identifier]
-            existing_url = existing_ch['url']
-
-            is_current_pixeldrain = "pixeldrain.dev" in url
-            is_existing_pixeldrain = "pixeldrain.dev" in existing_url
-            
-            is_current_pub = "pub-" in url or "pub." in url
-            is_existing_pub = "pub-" in existing_url or "pub." in existing_url
-
-            if is_current_pixeldrain and is_existing_pub:
-                channel_map[identifier] = ch
-            elif is_existing_pixeldrain and is_current_pub:
-                pass
-            else:
-                if not is_existing_pixeldrain and is_current_pixeldrain:
-                    channel_map[identifier] = ch
-
-    # 3. Final M3U file generate karo
+    # Final M3U file generate karo
     final_output = ["#EXTM3U"]
-    for ch in channel_map.values():
+    for item in channel_map.values():
+        ch = item['ch']
         final_output.append(ch['meta'])
         final_output.append(ch['url'])
 
     with open("playlist.m3u", "w", encoding="utf-8") as f:
         f.write("\n".join(final_output))
     
-    print("Playlist successfully merged and cleaned!")
+    print("Playlist successfully merged, priority and duplicate rules applied!")
 
 if __name__ == "__main__":
     main()
