@@ -36,16 +36,21 @@ def parse_m3u(content):
     return channels
 
 def get_channel_identifier(meta):
-    match = re.search(r'title=["\']([^"\']+)["\']', meta)
+    # Ab duplicate pehchanne ke liye poster image URL (tvg-logo) ka use karenge
+    match = re.search(r'tvg-logo=["\']([^"\']+)["\']', meta)
     if match:
-        return match.group(1).strip().lower()
+        # Logo URL ko clean karke return karenge taaki exact match ho
+        logo_url = match.group(1).strip().lower()
+        # Agar image URL me size ya dimensions ka koi parameter ho toh use hata sakte hain, 
+        # par filmyfly me direct URL hota hai isliye ye seedha kaam karega
+        return logo_url
+    
+    # Agar kisi me logo na ho toh fallback ke liye pura meta line le lo
     return meta.strip().lower()
 
 def main():
     channel_map = {}
     
-    # Dono playlists ko sequentially process karenge
-    # Pehle 1st playlist aayegi, fir 2nd playlist aayegi
     for index, url in enumerate(URLS):
         try:
             content = fetch_m3u(url)
@@ -60,13 +65,11 @@ def main():
                 is_current_pub = "pub-" in url_val or "pub." in url_val
 
                 if identifier not in channel_map:
-                    # Agar naya channel hai toh seedhe add kar lo
                     channel_map[identifier] = {
                         'ch': ch,
                         'playlist_index': index
                     }
                 else:
-                    # Agar duplicate mil gaya
                     existing = channel_map[identifier]
                     existing_ch = existing['ch']
                     existing_url = existing_ch['url']
@@ -74,15 +77,13 @@ def main():
                     is_existing_pixeldrain = "pixeldrain.dev" in existing_url
                     is_existing_pub = "pub-" in existing_url or "pub." in existing_url
 
-                    # Rule 1: Agar ek me pixeldrain hai aur dusre me pub hai, toh pixeldrain ko hi rakho
+                    # Rule 1: Pixeldrain ko priority do agar dusre me pub ho
                     if is_current_pixeldrain and is_existing_pub:
                         channel_map[identifier] = {'ch': ch, 'playlist_index': index}
                     elif is_existing_pixeldrain and is_current_pub:
-                        pass # Purana pixeldrain hi rehne do
+                        pass 
                     else:
-                        # Rule 2: Agar dono same type ke hain (jaise dono pixeldrain ya dono pub), 
-                        # toh pehli playlist (index 0) wale ko hi priority deni hai.
-                        # Matlab agar pehle se 1st playlist ka data hai, toh 2nd wale ko ignore kar do.
+                        # Rule 2: Pehli playlist ko priority do
                         if existing['playlist_index'] > index:
                             channel_map[identifier] = {'ch': ch, 'playlist_index': index}
 
@@ -99,7 +100,7 @@ def main():
     with open("playlist.m3u", "w", encoding="utf-8") as f:
         f.write("\n".join(final_output))
     
-    print("Playlist successfully merged, priority and duplicate rules applied!")
+    print(f"Playlist successfully merged using Poster Image URL! Total unique items: {len(channel_map)}")
 
 if __name__ == "__main__":
     main()
